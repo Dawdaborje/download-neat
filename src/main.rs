@@ -3,9 +3,15 @@ mod config;
 
 use dirs;
 use rust_search::SearchBuilder;
-use file_handler::{ handle_video_files, handle_image_files, handle_audio_files };
-use std::{ path::{ Path, PathBuf }, sync::mpsc };
-use notify::{ Event, RecursiveMode, Result, Watcher };
+use file_handler::{
+    handle_video_files,
+    handle_image_files,
+    handle_audio_files,
+    handle_document_files,
+    handle_windows_executables,
+};
+use std::{ path::{ Path }, sync::mpsc };
+use notify::{ Event, RecursiveMode, Watcher };
 
 const VIDEO_EXTENSIONS: [&str; 12] = [
     "mp4",
@@ -37,16 +43,34 @@ const IMAGE_EXTENSIONS: [&str; 10] = [
 
 const AUDIO_EXTENSIONS: [&str; 4] = ["mp3", "m4a", "m4b", "m4r"];
 
+const DOCUMENT_EXTENSIONS: [&str; 9] = [
+    "pdf",
+    "doc",
+    "docx",
+    "txt",
+    "csv",
+    "xls",
+    "xlsx",
+    "ppt",
+    "pptx",
+];
+
+const WINDOWS_EXECUTABLE_EXTENSIONS: [&str; 2] = ["exe", "msi"];
+
 fn process_downloads(download_dir: &Path) {
     let search_results = SearchBuilder::default().location(download_dir).depth(1).build();
 
     let videos_folder = download_dir.join("Videos");
     let images_folder = download_dir.join("Images");
     let audio_folder = download_dir.join("Audio");
+    let documents_folder = download_dir.join("Documents");
+    let windows_executables_folder = download_dir.join("Windows Executables");
 
     let mut videos = Vec::new();
     let mut images = Vec::new();
     let mut audio = Vec::new();
+    let mut documents = Vec::new();
+    let mut windows_executables = Vec::new();
 
     for result in search_results {
         if let Some(ext) = result.split('.').last() {
@@ -57,6 +81,10 @@ fn process_downloads(download_dir: &Path) {
                 images.push(result.clone());
             } else if AUDIO_EXTENSIONS.contains(&ext.as_str()) {
                 audio.push(result.clone());
+            } else if DOCUMENT_EXTENSIONS.contains(&ext.as_str()) {
+                documents.push(result.clone());
+            } else if WINDOWS_EXECUTABLE_EXTENSIONS.contains(&ext.as_str()) {
+                windows_executables.push(result.clone());
             }
         }
     }
@@ -69,6 +97,12 @@ fn process_downloads(download_dir: &Path) {
     }
     if !audio.is_empty() {
         handle_audio_files(audio, audio_folder);
+    }
+    if !documents.is_empty() {
+        handle_document_files(documents, documents_folder);
+    }
+    if !windows_executables.is_empty() {
+        handle_windows_executables(windows_executables, windows_executables_folder);
     }
 }
 
