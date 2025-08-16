@@ -9,3 +9,5 @@ A personal tool for arranging my download files
 ```bash
 make purge # to remove the software from your system
 ```
+
+## [License](LICENSE)
