@@ -63,7 +63,7 @@ fn process_downloads(download_dir: &Path) {
     let videos_folder = download_dir.join("Videos");
     let images_folder = download_dir.join("Images");
     let audio_folder = download_dir.join("Audio");
-    let documents_folder = download_dir.join("Documents");
+    let documents_folder = download_dir.join("Documents Files");
     let windows_executables_folder = download_dir.join("Windows Executables");
 
     let mut videos = Vec::new();
