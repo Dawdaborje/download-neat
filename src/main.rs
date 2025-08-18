@@ -107,7 +107,13 @@ fn process_downloads(download_dir: &Path) {
 }
 
 fn main() -> notify::Result<()> {
-    let download_dir = dirs::download_dir().unwrap();
+    let download_dir = dirs::download_dir() {
+        Some(path) => path,
+        None => {
+            println!("Failed to find the Downloads directory");
+            return Ok(());
+        }
+    };
 
     process_downloads(&download_dir);
 
