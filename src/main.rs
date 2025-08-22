@@ -1,64 +1,36 @@
-mod file_handler;
 mod config;
+mod file_handler;
 
 use dirs;
-use rust_search::SearchBuilder;
 use file_handler::{
-    handle_video_files,
-    handle_image_files,
-    handle_audio_files,
-    handle_document_files,
+    handle_audio_files, handle_document_files, handle_image_files, handle_video_files,
     handle_windows_executables,
 };
-use std::{ path::{ Path }, sync::mpsc };
-use notify::{ Event, RecursiveMode, Watcher };
+use notify::{Event, RecursiveMode, Watcher};
+use rust_search::SearchBuilder;
+use std::{fs, path::Path, sync::mpsc};
 
 const VIDEO_EXTENSIONS: [&str; 12] = [
-    "mp4",
-    "mov",
-    "avi",
-    "mkv",
-    "wmv",
-    "flv",
-    "webm",
-    "m4v",
-    "m4p",
-    "m4b",
-    "m4r",
-    "m4a",
+    "mp4", "mov", "avi", "mkv", "wmv", "flv", "webm", "m4v", "m4p", "m4b", "m4r", "m4a",
 ];
 
 const IMAGE_EXTENSIONS: [&str; 10] = [
-    "jpg",
-    "jpeg",
-    "png",
-    "gif",
-    "bmp",
-    "tiff",
-    "tif",
-    "webp",
-    "heic",
-    "heif",
+    "jpg", "jpeg", "png", "gif", "bmp", "tiff", "tif", "webp", "heic", "heif",
 ];
 
 const AUDIO_EXTENSIONS: [&str; 4] = ["mp3", "m4a", "m4b", "m4r"];
 
 const DOCUMENT_EXTENSIONS: [&str; 9] = [
-    "pdf",
-    "doc",
-    "docx",
-    "txt",
-    "csv",
-    "xls",
-    "xlsx",
-    "ppt",
-    "pptx",
+    "pdf", "doc", "docx", "txt", "csv", "xls", "xlsx", "ppt", "pptx",
 ];
 
 const WINDOWS_EXECUTABLE_EXTENSIONS: [&str; 2] = ["exe", "msi"];
 
 fn process_downloads(download_dir: &Path) {
-    let search_results = SearchBuilder::default().location(download_dir).depth(1).build();
+    let search_results = SearchBuilder::default()
+        .location(download_dir)
+        .depth(1)
+        .build();
 
     let videos_folder = download_dir.join("Videos");
     let images_folder = download_dir.join("Images");
@@ -73,18 +45,54 @@ fn process_downloads(download_dir: &Path) {
     let mut windows_executables = Vec::new();
 
     for result in search_results {
-        if let Some(ext) = result.split('.').last() {
-            let ext = ext.to_lowercase();
+        let full_path = download_dir.join(&result);
+        let file_path_str = full_path.to_string_lossy().to_string();
+
+        // First try extension-based detection
+        if let Some(ext) = full_path.extension() {
+            let ext = ext.to_string_lossy().to_lowercase();
             if VIDEO_EXTENSIONS.contains(&ext.as_str()) {
-                videos.push(result.clone());
+                videos.push(file_path_str.clone());
+                continue;
             } else if IMAGE_EXTENSIONS.contains(&ext.as_str()) {
-                images.push(result.clone());
+                images.push(file_path_str.clone());
+                continue;
             } else if AUDIO_EXTENSIONS.contains(&ext.as_str()) {
-                audio.push(result.clone());
+                audio.push(file_path_str.clone());
+                continue;
             } else if DOCUMENT_EXTENSIONS.contains(&ext.as_str()) {
-                documents.push(result.clone());
+                documents.push(file_path_str.clone());
+                continue;
             } else if WINDOWS_EXECUTABLE_EXTENSIONS.contains(&ext.as_str()) {
-                windows_executables.push(result.clone());
+                windows_executables.push(file_path_str.clone());
+                continue;
+            }
+        }
+
+        // If no extension match, try content-based detection
+        if let Ok(buffer) = fs::read(&full_path) {
+            if let Some(kind) = infer::get(&buffer) {
+                match kind.mime_type() {
+                    mime if mime.starts_with("image/") => {
+                        images.push(file_path_str);
+                    }
+                    mime if mime.starts_with("video/") => {
+                        videos.push(file_path_str);
+                    }
+                    mime if mime.starts_with("audio/") => {
+                        audio.push(file_path_str);
+                    }
+                    mime if mime.contains("pdf")
+                        || mime.contains("document")
+                        || mime.contains("spreadsheet") =>
+                    {
+                        documents.push(file_path_str);
+                    }
+                    mime if mime.contains("executable") || mime.contains("application/x-msi") => {
+                        windows_executables.push(file_path_str);
+                    }
+                    _ => {}
+                }
             }
         }
     }
@@ -107,7 +115,7 @@ fn process_downloads(download_dir: &Path) {
 }
 
 fn main() -> notify::Result<()> {
-    let download_dir = dirs::download_dir() {
+    let download_dir = match dirs::download_dir() {
         Some(path) => path,
         None => {
             println!("Failed to find the Downloads directory");
